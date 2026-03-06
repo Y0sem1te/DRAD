@@ -1,0 +1,82 @@
+# =========================
+# Python cache / build
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Type checker / linter caches
+.mypy_cache/
+.ruff_cache/
+.pyre/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+*.log.*
+
+# =========================
+# Project outputs (large / generated)
+# =========================
+train_output/
+train_output_video/
+inference_results/
+
+# Preprocessed frame cache
+preprocess/npys/
+
+# Temporary files
+tmp/
+*.tmp
+
+# Model weights / adapters (large)
+model/
+weights/
+checkpoints/
+
+# Dataset binaries and media (large)
+data/
+dataset/
+videos/
+images/
+
+# Common artifacts
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.safetensors
+*.onnx
+*.npy
+*.npz
+*.h5
+
+# Keep scripts but ignore generated evaluation text dumps
+hyp*.txt
+ref*.txt

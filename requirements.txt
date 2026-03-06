@@ -1,0 +1,35 @@
+# Core DL stack (install a CUDA-matching torch build in your environment)
+torch>=2.5.0
+torchvision>=0.20.0
+torchaudio>=2.5.0
+
+# Qwen / training stack
+transformers>=4.44.0
+accelerate>=0.34.0
+deepspeed>=0.15.0
+peft>=0.12.0
+qwen-vl-utils>=0.0.8
+
+# Data processing & vision
+numpy>=1.24.0
+pillow>=10.0.0
+opencv-python>=4.8.0
+matplotlib>=3.7.0
+decord>=0.6.0
+tqdm>=4.66.0
+
+# Evaluation
+pycocoevalcap>=1.2
+nltk>=3.8.1
+rouge-score>=0.1.2
+jieba>=0.42.1
+
+# Logging / visualization
+tensorboard>=2.14.0
+
+# CLIP (used in eval and preprocessing)
+git+https://github.com/openai/CLIP.git
+
+# Text utils (commonly required by tokenizer stack)
+ftfy>=6.2.0
+regex>=2024.0.0
