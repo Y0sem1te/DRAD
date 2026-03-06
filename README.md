@@ -18,7 +18,9 @@ DRAD/
 │   ├── msr-vtt/                          # video-task data (MSR-VTT)
 │   └── MSVD/                             # video-task data (MSVD)
 ├── preprocess/
-│   └── create_train_data.py
+│   ├── create_train_data.py
+|   └── preprocess_video_frames.py        # offline frame-cache preprocessing
+|
 ├── shell/                                # Shell scripts directory
 │   ├── run_preprocess_msrvtt.sh
 │   ├── run_video_training_msr_vtt.sh
@@ -26,7 +28,6 @@ DRAD/
 │   ├── run_image_training_hspt.sh
 │   ├── run_train_different_datasets.sh
 │   └── run_eval_multiple_lora.sh
-├── preprocess_video_frames.py            # offline frame-cache preprocessing
 ├── finetune_distributed.py               # distributed training for image tasks
 ├── finetune_distributed_video.py         # video training (legacy)
 ├── finetune_distributed_video_rapid.py   # video training (recommended, with frame cache)
