@@ -5,14 +5,12 @@ This project is built on top of `Qwen2.5-VL` and provides two major pipelines:
 - Image task training/evaluation (hospital scenario, with dynamic-context RAG evaluation)
 - Video task training/evaluation (MSR-VTT / MSVD, with frame-level history memory and Teacher Forcing)
 
-The recommended video training entry is `finetune_distributed_video_rapid.py` (includes frame-cache acceleration).
-
 ---
 
 ## 1. Project Structure
 
 ```text
-main_experiment/
+DRAD/
 ├── README.md
 ├── model/                                # Qwen2.5-VL-3B base model directory (prepare manually)
 ├── data/
@@ -21,6 +19,13 @@ main_experiment/
 │   └── MSVD/                             # video-task data (MSVD)
 ├── preprocess/
 │   └── create_train_data.py
+├── shell/                                # Shell scripts directory
+│   ├── run_preprocess_msrvtt.sh
+│   ├── run_video_training_msr_vtt.sh
+│   ├── run_video_training_msvd.sh
+│   ├── run_image_training_hspt.sh
+│   ├── run_train_different_datasets.sh
+│   └── run_eval_multiple_lora.sh
 ├── preprocess_video_frames.py            # offline frame-cache preprocessing
 ├── finetune_distributed.py               # distributed training for image tasks
 ├── finetune_distributed_video.py         # video training (legacy)
@@ -28,13 +33,8 @@ main_experiment/
 ├── eval_metrics.py                       # image evaluation (with RAG)
 ├── eval_metrics_norag.py                 # image evaluation (without RAG)
 ├── dynamic_context_evaluator.py          # dynamic context retrieval module
-├── util/
-│   └── logutil.py
-├── run_preprocess_msrvtt.sh
-├── run_video_training_msr_vtt.sh
-├── run_video_training_msvd.sh
-├── run_image_training_hspt.sh
-└── run_eval_multiple_lora.sh
+└── util/
+    └── logutil.py
 ```
 
 ---
@@ -57,7 +57,7 @@ If you use the official Qwen VL toolchain, ensure `qwen_vl_utils` is available i
 
 ### 3.1 Base Model
 
-Place the Qwen2.5-VL base model in `./model` under this project root.
+Place the Qwen2.5-VL-3B base model in `./model` under this project root.
 All training/evaluation scripts load from this path by default.
 
 ### 3.2 Video Dataset Format (`finetune_distributed_video_rapid.py`)
