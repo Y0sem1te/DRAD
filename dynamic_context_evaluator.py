@@ -1,6 +1,8 @@
 """
-动态上文评估模块
-在测试阶段实时维护向量数据库，用历史推理结果作为上文
+dynamic context evaluator
+
+This module implements a dynamic context evaluator for the hospital safety m
+onitoring task. It maintains a history of past inference results and their corresponding image embeddings, and dynamically retrieves similar historical frames as context for each test image.
 """
 
 import os
@@ -19,9 +21,9 @@ logger = logging.getLogger(__name__)
 
 class DynamicContextEvaluator:
     """
-    动态上文评估器
-    - 维护历史推理结果的向量数据库
-    - 为每张测试图片动态查找相似的历史帧作为上文
+    Dynamic Context Evaluator
+    - Maintains a vector database of past inference results
+    - Dynamically retrieves similar historical frames as context for each test image
     """
     
     def __init__(self, 
@@ -31,44 +33,30 @@ class DynamicContextEvaluator:
                  device="cuda"):
         """
         Args:
-            similarity_threshold: 相似度阈值，低于此值的参考会被舍弃
-            max_lookback: 最多往前查找多少张图片
-            top_k: 最多取前k个相似的作为上文
-            device: 设备（主模型的设备，CLIP会用CPU）
+            similarity_threshold: Similarity threshold, references below this value will be discarded
+            max_lookback: Maximum number of images to look back
+            top_k: Maximum number of similar images to consider as context
+            device: Device (main model's device, CLIP will use CPU)
         """
         self.similarity_threshold = similarity_threshold
         self.max_lookback = max_lookback
         self.top_k = top_k
         self.device = device
         
-            # 加载 CLIP 模型用于图片编
-        logger.info("加载 CLIP 模型用于动态上文推理（使用GPU）...")
+        logger.info("Loading CLIP model for dynamic context reasoning (using GPU)...")
         self.clip_device = "cuda"
         self.clip_model, self.preprocess = clip.load("ViT-L/14", device=self.clip_device)
         self.clip_model.eval()
-        
-        # 历史记录：存储每张图片的编码和推理结果
+
         self.history = []  # List of {"image_path": str, "embedding": np.array, "prediction": str}
-        
-        # 编码缓存：避免重复编码同一张图片
         self.encoding_cache = {}  # {image_path: embedding}
         
-        logger.info(f"动态上文评估器初始化完成:")
-        logger.info(f"  - 相似度阈值: {similarity_threshold}")
-        logger.info(f"  - 最大回溯: {max_lookback}")
+        logger.info(f"Dynamic Context Evaluator initialized:")
+        logger.info(f"  - Similarity threshold: {similarity_threshold}")
+        logger.info(f"  - Maximum lookback: {max_lookback}")
         logger.info(f"  - Top-K: {top_k}")
     
     def encode_image(self, image_path: str) -> np.ndarray:
-        """
-        使用 CLIP 编码图片（带缓存）
-        
-        Args:
-            image_path: 图片路径
-        
-        Returns:
-            归一化的图片向量 (768维)
-        """
-        # 检查缓存
         if image_path in self.encoding_cache:
             return self.encoding_cache[image_path]
         
@@ -78,52 +66,46 @@ class DynamicContextEvaluator:
             
             with torch.no_grad():
                 embedding = self.clip_model.encode_image(image_input)
-                # 归一化
                 embedding = embedding / embedding.norm(dim=-1, keepdim=True)
                 embedding = embedding.cpu().numpy()[0]  # [768]
             
-            # 缓存结果
             self.encoding_cache[image_path] = embedding
             return embedding
         except Exception as e:
-            logger.error(f"编码图片失败 {image_path}: {e}")
+            logger.error(f"Failed to encode image {image_path}: {e}")
             return np.zeros(768, dtype=np.float32)
     
     def compute_similarity(self, emb1: np.ndarray, emb2: np.ndarray) -> float:
         """
-        计算两个向量的余弦相似度
+        Compute cosine similarity between two vectors
         
         Args:
-            emb1: 向量1
-            emb2: 向量2
+            emb1: Vector 1
+            emb2: Vector 2
         
         Returns:
-            相似度 (0~1)
+            Similarity (0~1)
         """
         return float(np.dot(emb1, emb2))
     
     def find_similar_context(self, current_image_path: str) -> List[Dict]:
         """
-        为当前图片查找相似的历史帧作为上文
+        Find similar historical frames as context for the current image
         
         Args:
-            current_image_path: 当前图片路径
+            current_image_path: Path to the current image
         
         Returns:
-            相似历史帧列表 [{"similarity": float, "prediction": str}, ...]
+            Similar historical frames [{"similarity": float, "prediction": str}, ...]
         """
-        # 如果没有历史，返回空
         if len(self.history) == 0:
             return []
-        
-        # 编码当前图片
+
         current_embedding = self.encode_image(current_image_path)
-        
-        # 确定查找范围：最多往前看 max_lookback 张
+
         lookback_count = min(self.max_lookback, len(self.history))
-        candidates = self.history[-lookback_count:]  # 取最近的 N 张
-        
-        # 计算相似度
+        candidates = self.history[-lookback_count:]
+
         similarities = []
         for hist in candidates:
             sim = self.compute_similarity(current_embedding, hist['embedding'])
@@ -133,8 +115,7 @@ class DynamicContextEvaluator:
                     'prediction': hist['prediction'],
                     'image_path': hist['image_path']
                 })
-        
-        # 按相似度降序排序，取 top-k
+
         similarities.sort(key=lambda x: x['similarity'], reverse=True)
         top_references = similarities[:self.top_k]
         
@@ -144,20 +125,16 @@ class DynamicContextEvaluator:
                                    base_prompt_template: str,
                                    references: List[Dict]) -> str:
         """
-        根据参考上文构建提示词
-        
         Args:
-            base_prompt_template: 基础提示词模板（无上文版本）
-            references: 参考上文列表
+            base_prompt_template: Base prompt template (without context)
+            references: List of contextual references
         
         Returns:
             
         """
         if not references:
-            # 没有上文，使用简化提示词
             return """你是一个医院安全监控分析员，正在分析最新的监控画面：\n1. 描述：简洁描述你在视频中看到的人员行为和画面内容。\n2. 异常判断：根据描述，判断视频是否存在以下异常情况（仅限当前视频内容）：\n   - 患者摔倒\n   - 患者突然瘫坐不动\n   - 患者倒地不起\n   - 医生正在抢救患者\n   - 患者或家属情绪激动、争执、推搡等冲突行为\n   - 其他常识类异常情况\n\n输出规则：\n- 如果没有异常，必须输出固定格式：`描述：xxx。异常判断：无异常状况。`\n- 如果有异常，必须输出固定格式：`描述：xxx。异常判断：请注意，出现了[具体异常]的情况，需要及时处理或知晓。`\n- **描述** 和 **异常判断** 两部分必须同时出现，缺一不可，且用全角冒号“：”。\n- 输出必须是一段话，不分段、不分条。\n\n例子（有异常）：\n描述：监控中患者从床上摔下来。异常判断：请注意，出现了患者摔倒的情况，需要及时处理或知晓。\n\n例子（无异常）：\n描述：监控中医生正在为患者测量血压。异常判断：无异常状况。"""
-        
-        # 有上文，构建带历史帧的提示词
+
         history_lines = []
         for i, ref in enumerate(references, 1):
             history_lines.append(f"- 历史帧{i}（相似度{ref['similarity']:.2%}）：{ref['prediction']}")
@@ -195,11 +172,11 @@ class DynamicContextEvaluator:
     
     def add_to_history(self, image_path: str, prediction: str):
         """
-        将当前图片和预测结果添加到历史记录
+        add inference result to history, including encoding the image and storing the prediction
         
         Args:
-            image_path: 图片路径
-            prediction: 模型预测的描述
+            image_path: Path to the image
+            prediction: Model prediction for the image
         """
         embedding = self.encode_image(image_path)
         self.history.append({
@@ -209,12 +186,10 @@ class DynamicContextEvaluator:
         })
     
     def reset_history(self):
-        """清空历史记录（开始新的测试集时调用）"""
         self.history = []
-        logger.info("历史记录已清空")
+        logger.info("Dynamic context history has been reset.")
     
     def get_history_count(self) -> int:
-        """获取当前历史记录数量"""
         return len(self.history)
 
 
@@ -228,20 +203,19 @@ def evaluate_with_dynamic_context(model,
                                    top_k=5,
                                    gen_max_new_tokens: int = 128):
     """
-    使用动态上文进行评估
     
     Args:
-        model: 训练好的模型
-        processor: 处理器
-        eval_dataset: 测试数据集（ToyDataSet 实例）
-        device: 设备
-        accelerator: Accelerator 实例
-        similarity_threshold: 相似度阈值
-        max_lookback: 最大回溯数量
-        top_k: Top-K 参考数量
+        model: model to evaluate
+        processor: processor for tokenization and prompt construction
+        eval_dataset: evaluation dataset (ToyDataSet instance)
+        device: device
+        accelerator: Accelerator instance
+        similarity_threshold: similarity threshold
+        max_lookback: maximum lookback count
+        top_k: Top-K reference count
     
     Returns:
-        平均损失
+        avg loss
     """
     model.eval()
 
@@ -261,8 +235,8 @@ def evaluate_with_dynamic_context(model,
     
     if accelerator.is_local_main_process:
         logger.info("=" * 80)
-        logger.info(f"📊 开始动态上文评估 | 总样本数: {len(eval_dataset)}")
-        logger.info(f"🔍 相似度阈值: {similarity_threshold} | 最大回溯: {max_lookback} | Top-K: {top_k}")
+        logger.info(f"📊 Starting dynamic context evaluation | Total samples: {len(eval_dataset)}")
+        logger.info(f"🔍 Similarity threshold: {similarity_threshold} | Maximum lookback: {max_lookback} | Top-K: {top_k}")
         logger.info("=" * 80)
     
     if accelerator.is_local_main_process:
@@ -371,7 +345,7 @@ def evaluate_with_dynamic_context(model,
                     })
             
             except Exception as e:
-                logger.error(f"评估样本 {idx} 失败: {e}")
+                logger.error(f"📊 Evaluation of sample {idx} failed: {e}")
                 continue
     
     if accelerator.is_local_main_process:
@@ -381,7 +355,7 @@ def evaluate_with_dynamic_context(model,
     
     if accelerator.is_local_main_process:
         logger.info("=" * 80)
-        logger.info(f"✅ 动态上文评估完成 | 平均损失: {avg_loss:.4f} | 总样本数: {eval_steps}")
+        logger.info(f"✅ Dynamic context evaluation completed | Average loss: {avg_loss:.4f} | Total samples: {eval_steps}")
         logger.info("=" * 80)
     
     return avg_loss
